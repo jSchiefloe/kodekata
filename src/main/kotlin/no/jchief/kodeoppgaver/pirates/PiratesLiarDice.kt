@@ -12,9 +12,9 @@ class PiratesLiarDice(
         var aktuellSpiller: Spiller = Jens()
         var rundeNr = 1
 
-        while (terninger.count() >= 2) {
+        while (true) {
             when (val svarFraForrigeRunde = forrigeSpiller.svar) {
-                is Svar.Raise -> {
+                is Svar.MedVerdi -> {
                     if (svarFraForrigeRunde.verdi == 66) {
                         aktuellSpiller.svar = Svar.Call()
                         println("#$rundeNr: ${aktuellSpiller.navn}: Svarer på 66: Call")
@@ -26,14 +26,14 @@ class PiratesLiarDice(
                 }
 
                 is Svar.Call -> {
-                    when ((aktuellSpiller.svar as Svar.Raise).erLøgn) {
-                        true -> {
-                            println("#$rundeNr: ${aktuellSpiller.navn}: Spill over. ${forrigeSpiller.navn} callet ${aktuellSpiller.navn} som svarte ${(aktuellSpiller.svar as Svar.Raise).verdi} og som var løgn. ${forrigeSpiller.navn} vinner! ")
+                    when (val svar = aktuellSpiller.svar) {
+                        is Svar.MedVerdi.Bluff -> {
+                            println("#$rundeNr: ${aktuellSpiller.navn}: Spill over. ${forrigeSpiller.navn} callet ${aktuellSpiller.navn} som svarte ${svar.verdi} og som var Bluff. ${forrigeSpiller.navn} vinner! ")
                             return
                         }
 
-                        false -> {
-                            println("#$rundeNr: ${aktuellSpiller.navn}: Spill over. ${forrigeSpiller.navn} callet ${aktuellSpiller.navn} som IKKE var løgn. ${aktuellSpiller.navn} vinner! ")
+                        else -> {
+                            println("#$rundeNr: ${aktuellSpiller.navn}: Spill over. ${forrigeSpiller.navn} callet ${aktuellSpiller.navn} som IKKE var Bluff. ${aktuellSpiller.navn} vinner! ")
                             return
                         }
                     }
@@ -55,33 +55,40 @@ sealed interface Spiller {
     var svar: Svar
     fun oppdaterSvar(eksisterendeSvar: Int, terningVerdi: Int)
 
-    class Jens(override var svar: Svar = Svar.Raise(0), override val navn: String = "Jens") : Spiller {
+    class Jens(override var svar: Svar = Svar.MedVerdi.Raise(0), override val navn: String = "Jens") : Spiller {
         override fun oppdaterSvar(eksisterendeSvar: Int, terningVerdi: Int) {
             svar = if (eksisterendeSvar == 66)
                 Svar.Call()
             else if (terningVerdi > eksisterendeSvar)
-                Svar.Raise(verdi = terningVerdi)
+                Svar.MedVerdi.Raise(verdi = terningVerdi)
             else
                 Svar.Call()
         }
     }
 
-    class Will(override var svar: Svar = Svar.Raise(0), override val navn: String = "Will") : Spiller {
+    class Will(override var svar: Svar = Svar.MedVerdi.Raise(0), override val navn: String = "Will") : Spiller {
         override fun oppdaterSvar(eksisterendeSvar: Int, terningVerdi: Int) {
             svar = if (eksisterendeSvar == 66)
                 Svar.Call()
             else if (terningVerdi > eksisterendeSvar)
-                Svar.Raise(verdi = terningVerdi)
+                Svar.MedVerdi.Raise(verdi = terningVerdi)
             else
-//                Svar.Raise(verdi = (eksisterendeSvar + 1..66).random(), erLøgn = true)
-                Svar.Raise(verdi = lagLøgnOver(eksisterendeSvar + 1), erLøgn = true)
+                Svar.MedVerdi.Bluff(verdi = lagLøgnOver(eksisterendeSvar + 1))
         }
     }
 }
 
 sealed interface Svar {
-    class Raise(val verdi: Int, val erLøgn: Boolean = false) : Svar {
-        override fun toString(): String = "Raise: $verdi, erLøgn: $erLøgn"
+    sealed interface MedVerdi {
+        val verdi: Int
+
+        class Raise(override val verdi: Int) : MedVerdi, Svar {
+            override fun toString(): String = "Raise: $verdi"
+        }
+
+        class Bluff(override val verdi: Int) : MedVerdi, Svar {
+            override fun toString(): String = "Bluff: $verdi"
+        }
     }
 
     class Call : Svar {
@@ -104,8 +111,11 @@ fun main() {
     ).play()
 }
 
-
-fun Stack<Terning>.taTo(): Pair<Terning, Terning> = Pair(this.pop(), this.pop())
+fun Stack<Terning>.taTo(): Pair<Terning, Terning> =
+    if (size >= 2)
+        Pair(this.pop(), this.pop())
+    else
+        error("ingen flere terninger. noe har gått galt?")
 
 
 fun Pair<Terning, Terning>.høyesteVerdi(): Int =
@@ -124,7 +134,7 @@ fun lagLøgnOver(minsteGyldigeBud: Int): Int {
     val tilfeldigTierplass = (siffer.first..6).random()
 
     val tilfeldigEnerplass = if (tilfeldigTierplass == siffer.first)
-            (siffer.second..6).random()
+        (siffer.second..6).random()
     else (1..6).random()
 
     return Pair(

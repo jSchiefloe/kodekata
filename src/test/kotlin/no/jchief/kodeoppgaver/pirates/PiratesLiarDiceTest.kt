@@ -12,11 +12,8 @@ class PiratesLiarDiceTest {
         jens.oppdaterSvar(0,51)
 
         println(jens.svar.toString())
-        assertTrue(jens.svar is Svar.Raise)
-        (jens.svar as Svar.Raise).let {
-            assertEquals(51, it.verdi)
-            assertFalse(it.erLøgn)
-        }
+        assertTrue(jens.svar is Svar.MedVerdi.Raise)
+        assertEquals(51, (jens.svar as Svar.MedVerdi.Raise).verdi)
     }
 
 }
